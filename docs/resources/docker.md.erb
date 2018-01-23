@@ -4,7 +4,7 @@ title: About the docker Resource
 
 # docker
 
-Use the `docker` InSpec audit resource to test configuration data for docker daemon. It is a very comprehensive resource. Please have a look at [docker_container](docker_container) and [docker_image](docker_image), too.
+Use the `docker` InSpec audit resource to test configuration data for the Docker daemon. It is a very comprehensive resource. Please have a look at [docker_container](docker_container) and [docker_image](docker_image), too.
 
 <br>
 
@@ -126,7 +126,7 @@ This InSpec audit resource has the following matchers. For a full list of availa
 
 ### images
 
-`images` returns information about docker image as returned by [docker images](https://docs.docker.com/engine/reference/commandline/images/). You can determine specific information about
+`images` returns information about a Docker image as returned by [docker images](https://docs.docker.com/engine/reference/commandline/images/). You can determine specific information about
 
     describe docker.images do
       its('ids') { should include 'sha:12b5df59...442b' }
@@ -156,7 +156,7 @@ This InSpec audit resource has the following matchers. For a full list of availa
 
 ### object('id')
 
-`object` returns low-level information about docker objects. It is calling [docker inspect](https://docs.docker.com/engine/reference/commandline/info/) under the hood.
+`object` returns low-level information about Docker objects. It is calling [docker inspect](https://docs.docker.com/engine/reference/commandline/info/) under the hood.
 
     describe docker.object(id) do
       its('Configuration.Path') { should eq 'value' }

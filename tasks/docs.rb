@@ -224,6 +224,7 @@ namespace :docs do # rubocop:disable Metrics/BlockLength
     res = f.meta(title: 'InSpec Resources Reference')
     res << f.h1('InSpec Resources Reference')
     res << f.p('The following InSpec audit resources are available:')
+    res << f.p('Also check out <a href="https://learn.chef.io/modules/explore-inspec-resources#/">Explore InSpec resources</a> on Learn Chef Rally to learn more about how to discover which resources are available.')
     list = ''
     resources.each do |file|
       name = File.basename(file).sub(/\.md\.erb$/, '')

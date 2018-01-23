@@ -4,7 +4,7 @@ title: InSpec Matchers Reference
 
 # InSpec Matchers Reference
 
-Inspec uses matchers to help compare resource values to expectations.
+InSpec uses matchers to help compare resource values to expectations.
 The following matchers are available:
 
 * `be`
@@ -14,7 +14,7 @@ The following matchers are available:
 * `include`
 * `match`
 
-<br>
+See [Explore InSpec resources](https://learn.chef.io/modules/explore-inspec-resources#/) on Learn Chef Rally to learn more about InSpec's built-in matchers.
 
 ## be
 
