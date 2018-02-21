@@ -25,6 +25,7 @@ require 'inspec/exceptions'
 require 'inspec/fetcher'
 require 'inspec/source_reader'
 require 'inspec/resource'
+require 'inspec/reporters'
 require 'inspec/backend'
 require 'inspec/profile'
 require 'inspec/runner'
@@ -201,7 +202,10 @@ class MockLoader
       mock.mock_command('', '', '', 0)
     }
 
-    cmd_exit_1 = mock.mock_command('', '', '', 1)
+    cmd_exit_1 = lambda { |x = nil|
+      stderr = x.nil? ? '' : File.read(File.join(scriptpath, 'unit/mock/cmd', x))
+      mock.mock_command('', '', stderr, 1)
+    }
 
     mock.commands = {
       '' => empty.call,
@@ -222,9 +226,6 @@ class MockLoader
       'ps axo label,pid,pcpu,pmem,vsz,rss,tty,stat,start,time,user:32,command' => cmd.call('ps-axoZ'),
       'ps -o pid,vsz,rss,tty,stat,time,ruser,args' => cmd.call('ps-busybox'),
       'ps --help' => empty.call,
-      'Get-Content win_secpol-abc123.cfg' => cmd.call('secedit-export'),
-      'secedit /export /cfg win_secpol-abc123.cfg' => cmd.call('success'),
-      'Remove-Item win_secpol-abc123.cfg' => cmd.call('success'),
       'env' => cmd.call('env'),
       '${Env:PATH}'  => cmd.call('$env-PATH'),
       # registry key test using winrm 2.0
@@ -237,7 +238,7 @@ class MockLoader
       'dpkg -s held-package' => cmd.call('dpkg-s-held-package'),
       'rpm -qia curl' => cmd.call('rpm-qia-curl'),
       'rpm -qia --dbpath /var/lib/fake_rpmdb curl' => cmd.call('rpm-qia-curl'),
-      'rpm -qia --dbpath /var/lib/rpmdb_does_not_exist curl' => cmd_exit_1,
+      'rpm -qia --dbpath /var/lib/rpmdb_does_not_exist curl' => cmd_exit_1.call,
       'pacman -Qi curl' => cmd.call('pacman-qi-curl'),
       'brew info --json=v1 curl' => cmd.call('brew-info--json-v1-curl'),
       '/usr/local/bin/brew info --json=v1 curl' => cmd.call('brew-info--json-v1-curl'),
@@ -251,7 +252,7 @@ class MockLoader
       "Rscript -e 'packageVersion(\"DBI\")'" => cmd.call('r-print-version'),
       "Rscript -e 'packageVersion(\"DoesNotExist\")'" => cmd.call('r-print-version-not-installed'),
       "perl -le 'eval \"require $ARGV[0]\" and print $ARGV[0]->VERSION or exit 1' DBD::Pg" => cmd.call('perl-print-version'),
-      "perl -le 'eval \"require $ARGV[0]\" and print $ARGV[0]->VERSION or exit 1' DOES::Not::Exist" => cmd_exit_1,
+      "perl -le 'eval \"require $ARGV[0]\" and print $ARGV[0]->VERSION or exit 1' DOES::Not::Exist" => cmd_exit_1.call,
       'pip show jinja2' => cmd.call('pip-show-jinja2'),
       'pip show django' => cmd.call('pip-show-django'),
       '/test/path/pip show django' => cmd.call('pip-show-non-standard-django'),
@@ -284,6 +285,7 @@ class MockLoader
       'initctl --version' => cmd.call('initctl--version'),
       # show ssh service Centos 7
       'systemctl show --all sshd' => cmd.call('systemctl-show-all-sshd'),
+      'systemctl show --all apache2' => cmd.call('systemctl-show-all-apache2'),
       '/path/to/systemctl show --all sshd' => cmd.call('systemctl-show-all-sshd'),
       'systemctl show --all dbus' => cmd.call('systemctl-show-all-dbus'),
       '/path/to/systemctl show --all dbus' => cmd.call('systemctl-show-all-dbus'),
@@ -356,9 +358,9 @@ class MockLoader
       # solaris 11 package manager
       'pkg info system/file-system/zfs' => cmd.call('pkg-info-system-file-system-zfs'),
       # dpkg-query all packages
-      "dpkg-query -W -f='${db:Status-Abbrev}  ${Package}  ${Version}\\n'" => cmd.call('dpkg-query-W'),
+      "dpkg-query -W -f='${db:Status-Abbrev}  ${Package}  ${Version}  ${Architecture}\\n'" => cmd.call('dpkg-query-W'),
       # rpm query all packages
-      "rpm -qa --queryformat '%{NAME}  %{VERSION}-%{RELEASE}\\n'" => cmd.call('rpm-qa-queryformat'),
+      "rpm -qa --queryformat '%{NAME}  %{VERSION}-%{RELEASE}  %{ARCH}\\n'" => cmd.call('rpm-qa-queryformat'),
       # port netstat on solaris 10 & 11
       'netstat -an -f inet -f inet6' => cmd.call('s11-netstat-an-finet-finet6'),
       # xinetd configuration
@@ -398,11 +400,14 @@ class MockLoader
       '/sbin/zpool get -Hp all tank' => cmd.call('zpool-get-all-tank'),
       # docker
       "4f8e24022ea8b7d3b117041ec32e55d9bf08f11f4065c700e7c1dc606c84fd17" => cmd.call('docker-ps-a'),
+      "9ef45813d4545f35d6fe9d6456c0b1063f9f5a80c699d3bb19da0699ab2d6ecc" => cmd.call('df'),
       "docker version --format '{{ json . }}'"  => cmd.call('docker-version'),
       "docker info --format '{{ json . }}'" => cmd.call('docker-info'),
       "docker inspect 71b5df59442b" => cmd.call('docker-inspec'),
       # docker images
       "83c36bfade9375ae1feb91023cd1f7409b786fd992ad4013bf0f2259d33d6406" => cmd.call('docker-images'),
+      # docker services
+      %{docker service ls --format '{"ID": {{json .ID}}, "Name": {{json .Name}}, "Mode": {{json .Mode}}, "Replicas": {{json .Replicas}}, "Image": {{json .Image}}, "Ports": {{json .Ports}}}'} => cmd.call('docker-service-ls'),
       # modprobe for kernel_module
       "modprobe --showconfig" => cmd.call('modprobe-config'),
       # get-process cmdlet for processes resource
@@ -455,13 +460,16 @@ class MockLoader
       "bash -c 'type \"firewall-cmd\"'" => cmd.call('firewall-cmd'),
       'rpm -qia firewalld' => cmd.call('pkg-info-firewalld'),
       'systemctl is-active sshd --quiet' => empty.call,
+      'systemctl is-active apache2 --quiet' => empty.call,
       'systemctl is-enabled sshd --quiet' => empty.call,
+      'systemctl is-enabled apache2 --quiet' => cmd_exit_1.call('systemctl-is-enabled-apache2-stderr'),
       'systemctl is-active dbus --quiet' => empty.call,
       'systemctl is-enabled dbus --quiet' => empty.call,
       '/path/to/systemctl is-active sshd --quiet' => empty.call,
       '/path/to/systemctl is-enabled sshd --quiet' => empty.call,
       '/usr/sbin/service sshd status' => empty.call,
       '/sbin/service sshd status' => empty.call,
+      'service apache2 status' => cmd_exit_1.call,
       'type "lsof"' => empty.call,
 
       # http resource - remote worker'
@@ -478,6 +486,13 @@ class MockLoader
       "curl -k -H 'Content-Type: application/json' http://localhost:9200/_nodes" => cmd.call('elasticsearch-cluster-no-ssl'),
       "curl -H 'Content-Type: application/json'  -u es_admin:password http://localhost:9200/_nodes" => cmd.call('elasticsearch-cluster-auth'),
       "curl -H 'Content-Type: application/json' http://elasticsearch.mycompany.biz:1234/_nodes" => cmd.call('elasticsearch-cluster-url'),
+
+      #security_policy resource calls
+      'Get-Content win_secpol-abc123.cfg' => cmd.call('secedit-export'),
+      'secedit /export /cfg win_secpol-abc123.cfg' => cmd.call('success'),
+      'Remove-Item win_secpol-abc123.cfg' => cmd.call('success'),
+      "(New-Object System.Security.Principal.SecurityIdentifier(\"S-1-5-32-544\")).Translate( [System.Security.Principal.NTAccount]).Value" => cmd.call('security-policy-sid-translated'),
+      "(New-Object System.Security.Principal.SecurityIdentifier(\"S-1-5-32-555\")).Translate( [System.Security.Principal.NTAccount]).Value" => cmd.call('security-policy-sid-untranslated'),
     }
     @backend
   end

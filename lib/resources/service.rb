@@ -1,7 +1,4 @@
 # encoding: utf-8
-# author: Christoph Hartmann
-# author: Dominik Richter
-# author: Stephan Renatus
 
 require 'hashie'
 
@@ -70,6 +67,8 @@ module Inspec::Resources
   # TODO: extend the logic to detect the running init system, independently of OS
   class Service < Inspec.resource(1)
     name 'service'
+    supports platform: 'unix'
+    supports platform: 'windows'
     desc 'Use the service InSpec audit resource to test if the named service is installed, running and/or enabled.'
     example "
       describe service('service_name') do
@@ -250,7 +249,17 @@ module Inspec::Resources
     end
 
     def is_enabled?(service_name)
-      inspec.command("#{service_ctl} is-enabled #{service_name} --quiet").exit_status == 0
+      result = inspec.command("#{service_ctl} is-enabled #{service_name} --quiet")
+      return true if result.exit_status == 0
+
+      # Some systems may not have a `.service` file for a particular service
+      # which causes the `systemctl is-enabled` check to fail despite the
+      # service being enabled. In that event we fallback to `sysv_service`.
+      if result.stderr =~ /Failed to get.*No such file or directory/
+        return inspec.sysv_service(service_name).enabled?
+      end
+
+      false
     end
 
     def is_active?(service_name)
@@ -642,6 +651,7 @@ module Inspec::Resources
 
   class SystemdService < Service
     name 'systemd_service'
+    supports platform: 'unix'
     desc 'Use the systemd_service InSpec audit resource to test if the named service (controlled by systemd) is installed, running and/or enabled.'
     example "
       # to override service mgmt auto-detection
@@ -664,6 +674,7 @@ module Inspec::Resources
 
   class UpstartService < Service
     name 'upstart_service'
+    supports platform: 'unix'
     desc 'Use the upstart_service InSpec audit resource to test if the named service (controlled by upstart) is installed, running and/or enabled.'
     example "
       # to override service mgmt auto-detection
@@ -686,6 +697,7 @@ module Inspec::Resources
 
   class SysVService < Service
     name 'sysv_service'
+    supports platform: 'unix'
     desc 'Use the sysv_service InSpec audit resource to test if the named service (controlled by SysV) is installed, running and/or enabled.'
     example "
       # to override service mgmt auto-detection
@@ -708,6 +720,7 @@ module Inspec::Resources
 
   class BSDService < Service
     name 'bsd_service'
+    supports platform: 'unix'
     desc 'Use the bsd_service InSpec audit resource to test if the named service (controlled by BSD init) is installed, running and/or enabled.'
     example "
       # to override service mgmt auto-detection
@@ -730,6 +743,7 @@ module Inspec::Resources
 
   class LaunchdService < Service
     name 'launchd_service'
+    supports platform: 'unix'
     desc 'Use the launchd_service InSpec audit resource to test if the named service (controlled by launchd) is installed, running and/or enabled.'
     example "
       # to override service mgmt auto-detection
@@ -752,6 +766,7 @@ module Inspec::Resources
 
   class RunitService < Service
     name 'runit_service'
+    supports platform: 'unix'
     desc 'Use the runit_service InSpec audit resource to test if the named service (controlled by runit) is installed, running and/or enabled.'
     example "
       # to override service mgmt auto-detection
