@@ -4,7 +4,7 @@ title: InSpec Matchers Reference
 
 # InSpec Matchers Reference
 
-Inspec uses matchers to help compare resource values to expectations.
+InSpec uses matchers to help compare resource values to expectations.
 The following matchers are available:
 
 * `be`
